@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import requests
 import re
@@ -33,25 +34,32 @@ def guardar_portafolio(portafolio):
     with open(PORTFOLIO_FILE, 'w') as f:
         json.dump(portafolio, f, indent=2)
 
+def get_pnl_style(val):
+    """Retornar estilo CSS según valor P&L"""
+    if isinstance(val, (int, float)):
+        if val > 0:
+            return 'color: #27ae60; font-weight: bold;'
+        elif val < 0:
+            return 'color: #e74c3c; font-weight: bold;'
+    return 'color: #888;'
+
 st.set_page_config(page_title="BVC Master Trader", layout="wide")
 
-# --- FUNCIONES DE CÁLCULO ---
-def obtener_tasa():
-    try:
-        res = requests.get("https://pydolarve.org/api/v1/views?page=bcv", timeout=5)
-        m = res.json().get('monitors', [])[0] # Tomamos el primer monitor (BCV)
-        return float(str(m.get('price')).replace(',', '.'))
-    except: return 473.87
-
-def escanear():
-    res = requests.get("https://www.bolsadecaracas.com/wp-content/themes/bvc/resumen_mercado.php")
-    return re.findall(r'id="([A-Z0-9\.]+)".+?no-border-top">([\d\.]+)<', res.text)
+# --- TEMA OSCURO GLOBAL ---
+st.markdown("""
+<style>
+/* Fondo negro global */
+.stApp {
+    background-color: #000000 !important;
+}
+</style>
+""")
 
 # --- INTERFAZ ---
 st.title("📊 BVC Master Trader: Compra / Venta")
 
 if 'tasa' not in st.session_state:
-    st.session_state.tasa = obtener_tasa()
+    st.session_state.tasa = 473.87
 
 with st.sidebar:
     st.header("⚙️ Configuración")
@@ -61,7 +69,9 @@ with st.sidebar:
     st.info("El bot enviará alertas automáticas solo en señales de VENTA críticas.")
 
 # --- LÓGICA PRINCIPAL ---
-data = escanear()
+data = requests.get("https://www.bolsadecaracas.com/wp-content/themes/bvc/resumen_mercado.php")
+data = re.findall(r'id="([A-Z0-9\.]+)".+?no-border-top">([\d\.]+)<', data.text)
+
 if data:
     df = pd.DataFrame(data, columns=['Ticker', 'Precio_Bs'])
     df['Precio_Bs'] = df['Precio_Bs'].astype(float)
@@ -159,55 +169,52 @@ if data:
             col1.metric("Total Invertido", f"${total_invertido:,.2f}")
             col2.metric("Valor Actual", f"${total_actual:,.2f}")
             color_pnl = "green" if pnl_total >= 0 else "red"
-            col3.metric("Ganancia/Pérdida", f"${pnl_total:,.2f}", f"{pnl_total_pct:.2f}%", delta_color="normal" if pnl_total >= 0 else "inverse")
             col4.metric("Posiciones Abiertas", len(df_resultados))
             
             # Tabla del portafolio - estilo terminal de trading profesional
-            def get_pnl_style(val):
-                """Retornar estilo CSS según valor"""
-                if isinstance(val, (int, float)):
-                    if val > 0:
-                        return 'color: #27ae60; font-weight: bold;'
-                    elif val < 0:
-                        return 'color: #e74c3c; font-weight: bold;'
-                return 'color: #888;'
             
             # Crear HTML de la tabla estilo terminal
-            # Diccionario de nombres completos de empresas
-            nombres_empresas = {
-                'ABC.A': "BCO. CARIBE 'A'",
-                'ALZ.B': "ALZA INVERSIONES",
-                'ARC.A': "ARCA INM. Y VAL. 'A'",
-                'ARC.B': "ARCA INM.VAL.'B'",
-                'BNC': "BCO.NAC.CREDITO",
-                'BPV': "BCO. PROVINCIAL",
-                'BVCC': "BOLSA Y CC. CCS",
-                'BVL': "B. DE VENEZUELA",
-                'CCP.B': "CERAMICA CARABOBO",
-                'DOM.A': "DOMINGUI",
-                'ENV.A': "ENVASES VENEZOLANOS",
-                'FNC': "FONDO NACIONAL",
-                'FON.A': "FONDOVAL 'A'",
-                'FON.B': "FONDOVAL 'B'",
-                'FON.C': "FONDOVAL 'C'",
-                'FTH.A': "FONDO DE INVERS. TH",
-                'GPV': "GRUPO VENEZOLANO",
-                'MAN.A': "MANPA",
-                'MVZ.A': "MERCANTIL VEN. 'A'",
-                'MVZ.B': "MERCANTIL VEN. 'B'",
-                'PCP.B': "PROAGRO 'B'",
-                'PGV.A': "PROAGRO VAL 'A'",
-                'PGV.B': "PROAGRO VAL 'B'",
-                'PHC.A': "PHILLIPS CARIBE",
-                'SCB.A': "SUDAMERICANO 'A'",
-                'SCB.B': "SUDAMERICANO 'B'",
-                'SIV.A': "SIDOR 'A'",
-                'SIV.B': "SIDOR 'B'",
-                'SNI.B': "SINAI 'B'",
-                'STG.A': "SANTA TERESA",
-                'TPG': "TECNICAS POLLI",
-                'VUL.A': "VULCANIZADOS",
+            # Diccionario de nombres completos de empresas con emojis representativos por industria
+            empresas_data = {
+                'ABC.A': {"nombre": "BCO. CARIBE 'A'", "logo": "🏛️", "color": "#003366"},
+                'ALZ.B': {"nombre": "ALZA INVERSIONES", "logo": "💹", "color": "#6b2c91"},
+                'ARC.A': {"nombre": "ARCA INM. 'A'", "logo": "🏗️", "color": "#1e5631"},
+                'ARC.B': {"nombre": "ARCA INM. 'B'", "logo": "🏗️", "color": "#1e5631"},
+                'BNC': {"nombre": "BCO. NAC. CRÉDITO", "logo": "🏦", "color": "#c41230"},
+                'BPV': {"nombre": "BCO. PROVINCIAL", "logo": "🏦", "color": "#004c3f"},
+                'BVCC': {"nombre": "BOLSA CARACAS", "logo": "📊", "color": "#003366"},
+                'BVL': {"nombre": "BANCO VENEZUELA", "logo": "🏦", "color": "#003366"},
+                'CCP.B': {"nombre": "CERÁMICA CARABOBO", "logo": "🏭", "color": "#8b4513"},
+                'DOM.A': {"nombre": "DOMÍNGUEZ", "logo": "🏪", "color": "#ff6600"},
+                'ENV.A': {"nombre": "ENVASES VENEZ.", "logo": "📦", "color": "#4a4a4a"},
+                'FNC': {"nombre": "FONDO NACIONAL", "logo": "💰", "color": "#228b22"},
+                'FON.A': {"nombre": "FONDOVAL 'A'", "logo": "💵", "color": "#003366"},
+                'FON.B': {"nombre": "FONDOVAL 'B'", "logo": "💵", "color": "#003366"},
+                'FON.C': {"nombre": "FONDOVAL 'C'", "logo": "💵", "color": "#003366"},
+                'FTH.A': {"nombre": "FONDO INV. TH", "logo": "📈", "color": "#6b2c91"},
+                'GPV': {"nombre": "GRUPO VENEZOLANO", "logo": "🏢", "color": "#8b4513"},
+                'MAN.A': {"nombre": "MANPA", "logo": "🥫", "color": "#dc143c"},
+                'MVZ.A': {"nombre": "MERCANTIL 'A'", "logo": "🏦", "color": "#003366"},
+                'MVZ.B': {"nombre": "MERCANTIL 'B'", "logo": "🏦", "color": "#003366"},
+                'PCP.B': {"nombre": "PROAGRO 'B'", "logo": "🌾", "color": "#8fbc8f"},
+                'PGV.A': {"nombre": "PROAGRO VAL 'A'", "logo": "🌾", "color": "#556b2f"},
+                'PGV.B': {"nombre": "PROAGRO VAL 'B'", "logo": "🌾", "color": "#556b2f"},
+                'PHC.A': {"nombre": "PHILLIPS CARIBE", "logo": "🔌", "color": "#2e8b57"},
+                'SCB.A': {"nombre": "SUDAMERICANO 'A'", "logo": "🏦", "color": "#003366"},
+                'SCB.B': {"nombre": "SUDAMERICANO 'B'", "logo": "🏦", "color": "#003366"},
+                'SIV.A': {"nombre": "SIDOR 'A'", "logo": "⚙️", "color": "#4a4a4a"},
+                'SIV.B': {"nombre": "SIDOR 'B'", "logo": "⚙️", "color": "#4a4a4a"},
+                'SNI.B': {"nombre": "SINAI 'B'", "logo": "🏗️", "color": "#8b4513"},
+                'STG.A': {"nombre": "SANTA TERESA", "logo": "🥃", "color": "#8b0000"},
+                'TPG': {"nombre": "TECNICAS POLLI", "logo": "🐔", "color": "#ff8c00"},
+                'VUL.A': {"nombre": "VULCANIZADOS", "logo": "🛞", "color": "#2f4f4f"},
             }
+            
+            # Función simple para mostrar logo (emoji en cuadrado de color)
+            def get_logo_html(emp_info):
+                color = emp_info.get('color', '#666666')
+                emoji = emp_info.get('logo', '📊')
+                return f"""<div style="width: 36px; height: 36px; background-color: {color}; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px;">{emoji}</div>"""
             
             html_table = """
             <style>
@@ -322,7 +329,7 @@ if data:
                 pnl_usd = row['G/P USD']
                 pnl_pct = row['G/P %']
                 ticker = row['Ticker']
-                nombre_empresa = nombres_empresas.get(ticker, ticker)
+                emp_info = empresas_data.get(ticker, {"nombre": ticker, "logo": "", "color": "#666666"})
                 
                 # Clasificar: verde (subiendo > 0.5%), rojo (bajando < -0.5%), amarillo (manteniendo)
                 if pnl_pct > 0.5:
@@ -344,8 +351,13 @@ if data:
                 html_table += f"""
                 <tr>
                     <td>
-                        <span class="ticker-name">{ticker}</span>
-                        <span class="company-name">{nombre_empresa}</span>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            {get_logo_html(emp_info)}
+                            <div>
+                                <div style="font-weight: 600; color: #ffffff; font-size: 14px;">{emp_info['nombre']}</div>
+                                <div style="color: #00ff00; font-size: 13px; font-weight: 500;">{ticker}</div>
+                            </div>
+                        </div>
                     </td>
                     <td>{row['Cantidad']:,}</td>
                     <td>${row['Costo Promedio']:,.2f}</td>
@@ -359,7 +371,7 @@ if data:
             
             html_table += "</tbody></table>"
             
-            st.markdown(html_table, unsafe_allow_html=True)
+            components.html(html_table, height=400, scrolling=True)
         
         # --- REGISTRAR VENTA ---
         if resultados:
@@ -429,7 +441,7 @@ if data:
                 
                 st.dataframe(
                     df_ventas.style
-                    .map(color_pnl, subset=['P&L Realizado USD', 'P&L %'])
+                    .map(get_pnl_style, subset=['P&L Realizado USD', 'P&L %'])
                     .format({
                         'Costo Promedio': '${:.2f}',
                         'Precio Venta': '${:.2f}',
@@ -496,6 +508,81 @@ if data:
 
     st.divider()
     st.subheader("📈 Resumen General del Mercado")
-    st.dataframe(df.style.format({'Precio_Bs': '{:,.2f}', 'Precio_USD': '{:,.4f}'}), use_container_width=True)
+    
+    # Crear HTML table estilo terminal para el resumen de mercado
+    html_mercado = """
+    <style>
+    .mercado-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        font-size: 14px;
+        background-color: #000000;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .mercado-table th {
+        background-color: #0a0a0a;
+        color: #606060;
+        font-weight: 500;
+        text-transform: uppercase;
+        font-size: 11px;
+        letter-spacing: 0.5px;
+        padding: 14px 12px;
+        border-bottom: 1px solid #1a1a1a;
+        text-align: center;
+    }
+    .mercado-table td {
+        padding: 12px;
+        border-bottom: 1px solid #111111;
+        background-color: #000000;
+        color: #e0e0e0;
+        text-align: center;
+        vertical-align: middle;
+    }
+    .mercado-table tr:hover td {
+        background-color: #0d0d0d;
+    }
+    .mercado-table td:first-child {
+        text-align: left;
+        padding-left: 20px;
+    }
+    </style>
+    <table class="mercado-table">
+    <thead>
+    <tr>
+        <th>Empresa</th>
+        <th>Ticker</th>
+        <th>Precio Bs</th>
+        <th>Precio USD</th>
+    </tr>
+    </thead>
+    <tbody>
+    """
+    
+    for _, row in df.iterrows():
+        ticker = row['Ticker']
+        emp_info = empresas_data.get(ticker, {"nombre": ticker, "logo": "📊", "color": "#666666"})
+        
+        html_mercado += f"""
+        <tr>
+            <td>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    {get_logo_html(emp_info)}
+                    <div>
+                        <div style="font-weight: 600; color: #ffffff; font-size: 14px;">{emp_info['nombre']}</div>
+                        <div style="color: #00ff00; font-size: 13px; font-weight: 500;">{ticker}</div>
+                    </div>
+                </div>
+            </td>
+            <td style="color: #00ff00; font-weight: 600;">{ticker}</td>
+            <td style="color: #e0e0e0;">${row['Precio_Bs']:,.2f}</td>
+            <td style="color: #00ff00; font-weight: 600;">${row['Precio_USD']:.4f}</td>
+        </tr>
+        """
+    
+    html_mercado += "</tbody></table>"
+    
+    components.html(html_mercado, height=600, scrolling=True)
 else:
     st.error("No se pudo conectar con la Bolsa de Caracas.")
