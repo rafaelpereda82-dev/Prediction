@@ -216,31 +216,31 @@ if data:
                 border-collapse: collapse;
                 font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
                 font-size: 14px;
-                background-color: #121212;
+                background-color: #000000;
                 border-radius: 8px;
                 overflow: hidden;
             }
             .portfolio-table th {
-                background-color: #1a1a1a;
-                color: #808080;
+                background-color: #0a0a0a;
+                color: #606060;
                 font-weight: 500;
                 text-transform: uppercase;
                 font-size: 11px;
                 letter-spacing: 0.5px;
                 padding: 14px 12px;
-                border-bottom: 1px solid #2a2a2a;
+                border-bottom: 1px solid #1a1a1a;
                 text-align: center;
             }
             .portfolio-table td {
                 padding: 12px;
-                border-bottom: 1px solid #1f1f1f;
-                background-color: #121212;
+                border-bottom: 1px solid #111111;
+                background-color: #000000;
                 color: #e0e0e0;
                 text-align: center;
                 vertical-align: middle;
             }
             .portfolio-table tr:hover td {
-                background-color: #1a1a1a;
+                background-color: #0d0d0d;
             }
             .portfolio-table td:first-child {
                 text-align: left;
@@ -252,29 +252,53 @@ if data:
                 font-size: 14px;
             }
             .company-name {
-                color: #808080;
+                color: #555555;
                 font-size: 11px;
                 font-weight: 400;
                 display: block;
                 margin-top: 2px;
             }
             .badge-green {
-                background-color: rgba(39, 174, 96, 0.2);
-                color: #27ae60;
+                background-color: rgba(0, 255, 0, 0.15);
+                color: #00ff00;
                 padding: 4px 10px;
                 border-radius: 12px;
                 font-weight: 600;
                 font-size: 13px;
                 display: inline-block;
+                border: 1px solid rgba(0, 255, 0, 0.3);
             }
             .badge-red {
-                background-color: rgba(231, 76, 60, 0.2);
-                color: #e74c3c;
+                background-color: rgba(255, 0, 0, 0.15);
+                color: #ff3333;
                 padding: 4px 10px;
                 border-radius: 12px;
                 font-weight: 600;
                 font-size: 13px;
                 display: inline-block;
+                border: 1px solid rgba(255, 0, 0, 0.3);
+            }
+            .badge-yellow {
+                background-color: rgba(255, 204, 0, 0.15);
+                color: #ffcc00;
+                padding: 4px 10px;
+                border-radius: 12px;
+                font-weight: 600;
+                font-size: 13px;
+                display: inline-block;
+                border: 1px solid rgba(255, 204, 0, 0.3);
+            }
+            .price-up {
+                color: #00ff00;
+                font-weight: 600;
+            }
+            .price-down {
+                color: #ff3333;
+                font-weight: 600;
+            }
+            .price-neutral {
+                color: #ffcc00;
+                font-weight: 600;
             }
             </style>
             <table class="portfolio-table">
@@ -300,15 +324,22 @@ if data:
                 ticker = row['Ticker']
                 nombre_empresa = nombres_empresas.get(ticker, ticker)
                 
-                if pnl_usd > 0:
+                # Clasificar: verde (subiendo > 0.5%), rojo (bajando < -0.5%), amarillo (manteniendo)
+                if pnl_pct > 0.5:
                     pnl_usd_html = f'<span class="badge-green">+${pnl_usd:,.2f}</span>'
                     pnl_pct_html = f'<span class="badge-green">+{pnl_pct:.2f}%</span>'
-                elif pnl_usd < 0:
+                    price_class = 'price-up'
+                elif pnl_pct < -0.5:
                     pnl_usd_html = f'<span class="badge-red">-${abs(pnl_usd):,.2f}</span>'
                     pnl_pct_html = f'<span class="badge-red">-{abs(pnl_pct):.2f}%</span>'
+                    price_class = 'price-down'
                 else:
-                    pnl_usd_html = f'<span style="color: #888;">${pnl_usd:.2f}</span>'
-                    pnl_pct_html = f'<span style="color: #888;">{pnl_pct:.2f}%</span>'
+                    # Amarillo para manteniendo (entre -0.5% y +0.5%)
+                    sign_usd = '+' if pnl_usd >= 0 else '-'
+                    sign_pct = '+' if pnl_pct >= 0 else '-'
+                    pnl_usd_html = f'<span class="badge-yellow">{sign_usd}${abs(pnl_usd):,.2f}</span>'
+                    pnl_pct_html = f'<span class="badge-yellow">{sign_pct}{abs(pnl_pct):.2f}%</span>'
+                    price_class = 'price-neutral'
                 
                 html_table += f"""
                 <tr>
@@ -318,9 +349,9 @@ if data:
                     </td>
                     <td>{row['Cantidad']:,}</td>
                     <td>${row['Costo Promedio']:,.2f}</td>
-                    <td>${row['Precio Actual']:,.2f}</td>
+                    <td class="{price_class}">${row['Precio Actual']:,.2f}</td>
                     <td>${row['Inversión USD']:,.2f}</td>
-                    <td>${row['Valor Actual USD']:,.2f}</td>
+                    <td class="{price_class}">${row['Valor Actual USD']:,.2f}</td>
                     <td>{pnl_usd_html}</td>
                     <td>{pnl_pct_html}</td>
                 </tr>
